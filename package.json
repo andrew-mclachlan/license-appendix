@@ -1,0 +1,19 @@
+{
+  "name": "license-appendix",
+  "version": "0.1.0",
+  "description": "Create an appendix from the license-checker output.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "license",
+    "appendix"
+  ],
+  "author": "Andrew McLachlan",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^2.20.0",
+    "license-checker": "^25.0.1"
+  }
+}
