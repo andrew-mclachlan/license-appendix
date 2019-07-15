@@ -11,7 +11,9 @@
             "program": "${workspaceFolder}/index.js",
             "args": [
                 "--path",
-                "${workspaceFolder}/../scan"
+                "${workspaceFolder}/../scan",
+                "--output",
+                "./appendix.txt"
             ]
         }
     ]
