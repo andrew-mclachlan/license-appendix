@@ -44,13 +44,14 @@ checker.init({ start: program.path, production: true, customFormat: customFormat
         fs.writeFileSync(outputFile, "####Appendix of packages and their licenses ####\n\n");
         Object.keys(packages).sort().forEach((key) => {
             let package = packages[key];
+            let licenseFile = package.licenseFile ? path.basename(package.licenseFile) : "<<License File Not Found>>";
             let str = "#####" + "\n";
             str += "name:\t" + package.name + "\n";
             str += "version:\t" + package.version + "\n";
             str += "description:\t" + package.description + "\n";
             str += "license(s):\t" + package.licenses + "\n";
-            str += "license file:\t" + package.licenseFile + "\n";
-            str += "license text:\t" + (package.licenseText || "<<Unknown License Text>>") + "\n";
+            str += "license file:\t" + licenseFile + "\n";
+            str += "license text:\t" + (package.licenseText || "<<License Text Not Found>>") + "\n";
             str += "#####" + "\n";
             fs.appendFileSync(outputFile, str);
         });
