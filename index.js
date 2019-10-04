@@ -51,9 +51,9 @@ checker.init({ start: program.path, production: true, customFormat: customFormat
                     "name": package.name,
                     "version": package.version,
                     "description": package.description,
-                    "license(s)": package.licenses,
-                    "license file": licenseFile,
-                    "license text": licenseText.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t"),
+                    "licenses": package.licenses,
+                    "license_file": licenseFile,
+                    "license_text": licenseText.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t"),
                 };
                 return license;
             });
