@@ -4,7 +4,8 @@ const path = require("path");
 const program = require("commander");
 
 program
-    .version("0.1.0")
+    .version("0.1.1")
+    .option("-j, --json", "output appendix in JSON format")
     .option("-p, --path [directory]", "package to scan")
     .option("-o, --output [file path]", "output appendix file path")
     .parse(process.argv);
@@ -41,20 +42,39 @@ checker.init({ start: program.path, production: true, customFormat: customFormat
     else {
         const outputFile = program.output;
         console.log("processing: " + program.path);
-        fs.writeFileSync(outputFile, "####Appendix of packages and their licenses ####\n\n");
-        Object.keys(packages).sort().forEach((key) => {
-            let package = packages[key];
-            let licenseFile = package.licenseFile ? path.basename(package.licenseFile) : "<<License File Not Found>>";
-            let str = "#####" + "\n";
-            str += "name:\t" + package.name + "\n";
-            str += "version:\t" + package.version + "\n";
-            str += "description:\t" + package.description + "\n";
-            str += "license(s):\t" + package.licenses + "\n";
-            str += "license file:\t" + licenseFile + "\n";
-            str += "license text:\t" + (package.licenseText || "<<License Text Not Found>>") + "\n";
-            str += "#####" + "\n";
-            fs.appendFileSync(outputFile, str);
-        });
+        if (program.json) {
+            let licenses = Object.keys(packages).sort().map((key) => {
+                const package = packages[key];
+                const licenseFile = package.licenseFile ? path.basename(package.licenseFile) : "<<License File Not Found>>";
+                const licenseText = package.licenseText || "<<License Text Not Found>>";
+                const license = {
+                    "name": package.name,
+                    "version": package.version,
+                    "description": package.description,
+                    "license(s)": package.licenses,
+                    "license file": licenseFile,
+                    "license text": licenseText.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t"),
+                };
+                return license;
+            });
+            fs.writeFileSync(outputFile, JSON.stringify(licenses, null, 2));
+        }
+        else {
+            fs.writeFileSync(outputFile, "####Appendix of packages and their licenses ####\n\n");
+            Object.keys(packages).sort().forEach((key) => {
+                const package = packages[key];
+                const licenseFile = package.licenseFile ? path.basename(package.licenseFile) : "<<License File Not Found>>";
+                let str = "#####" + "\n";
+                str += "name:\t" + package.name + "\n";
+                str += "version:\t" + package.version + "\n";
+                str += "description:\t" + package.description + "\n";
+                str += "license(s):\t" + package.licenses + "\n";
+                str += "license file:\t" + licenseFile + "\n";
+                str += "license text:\t" + (package.licenseText || "<<License Text Not Found>>") + "\n";
+                str += "#####" + "\n";
+                fs.appendFileSync(outputFile, str);
+            });
+        }
         console.log("Done.");
     }
 });
