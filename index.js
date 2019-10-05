@@ -54,6 +54,7 @@ checker.init({ start: program.path, production: true, customFormat: customFormat
                     "licenses": package.licenses,
                     "license_file": licenseFile,
                     "license_text": licenseText.replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t"),
+                    "repository": package.repository || "<<License Repository Not Found>>",
                 };
                 return license;
             });
@@ -68,6 +69,7 @@ checker.init({ start: program.path, production: true, customFormat: customFormat
                 str += "name:\t" + package.name + "\n";
                 str += "version:\t" + package.version + "\n";
                 str += "description:\t" + package.description + "\n";
+                str += "repository:\t" + (package.repository || "<<License Repository Not Found>>") + "\n";
                 str += "license(s):\t" + package.licenses + "\n";
                 str += "license file:\t" + licenseFile + "\n";
                 str += "license text:\t" + (package.licenseText || "<<License Text Not Found>>") + "\n";
