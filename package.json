@@ -14,6 +14,7 @@
   "license": "MIT",
   "dependencies": {
     "commander": "^2.20.0",
-    "license-checker": "^25.0.1"
+    "license-checker": "^25.0.1",
+    "node-fetch": "^2.6.0"
   }
 }
