@@ -130,7 +130,7 @@ const fixLicenseErrors = async (pkgsInfo, authToken) => {
     const pkg = {
       ...pkgsInfo[i]
     };
-    let matches = pkg.licenseText.match(new RegExp(/(.|\\n){0,}#{1,}\s{0,}license\s{1,}(.[^#]*)/i));
+    let matches = pkg.licenseText.match(new RegExp(/.{0,}\n{0,}#{1,}\s{0,}licen(c|s)e\s{1,}(.[^#]*)/i));
     let licenseText = (matches && matches[2]) || '';
     licenseText = licenseText.trim();
     if (licenseText.length) {
