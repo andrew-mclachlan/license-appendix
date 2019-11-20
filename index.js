@@ -4,8 +4,7 @@ const path = require("path");
 const program = require("commander");
 
 const developLicenses = require('./lib/create-licenses').developLicenses;
-
-const fetch = require("node-fetch");
+const fetchLicensesFromRepo = require('./lib/fetch-licenses').fetchLicensesFromRepo;
 
 program
     .version("0.1.1")
@@ -40,108 +39,27 @@ const customFormat = {
     "description": "<<Unknown Description>>"
 };
 
-const getLicenseFileUrl = async (repoUrl, authToken) => {
-  let res = await fetch(repoUrl, {
-    headers: {
-      Authorization: 'Bearer ' + authToken
-    }
-  });
-  let licenseRegex = new RegExp(/^(license|licence)(.txt){0,}$/i);
-  if (res.status === 401) {
-    throw Error('Either token invalid or 5000 requests/hour quota expired');
-  }
-  if (res.status <= 400 && res.statusText === 'OK') {
-    let response = await res.text();
-    response = JSON.parse(response);
-    let licenseFile = response.find(elem => elem.type !== 'dir' && licenseRegex.test(elem.name));
-    return licenseFile && licenseFile.url;
-  }
-};
 
-const getLicenseFile = async (url, authToken) => {
-  let res = await fetch(url, {
-    headers: {
-      Authorization: 'Bearer ' + authToken
-    }
-  });
-  res = await res.text();
-  res = JSON.parse(res);
-  return Buffer.from(res.content, res.encoding).toString('ascii');
-};
+const updateFixedLicenses = (pkgs, fixedLicenses) => {
+  for (let i = 0; i < pkgs.length; i++) {
+    const pkg = pkgs[i];
+    let match = fixedLicenses.find(license => license.name === pkg.name);
 
-const fetchLicense = async (repoPath, authToken) => {
-  let repoUrl = 'https://api.github.com/repos/' + repoPath + '/contents/';
-  let licenseFileUrl = await getLicenseFileUrl(repoUrl, authToken);
-  if (licenseFileUrl) {
-    let license = await getLicenseFile(licenseFileUrl, authToken);
-    return license;
-  }
-};
-
-const fetchLicensesFromRepo = async (pkgs, authToken) =>  {
-  let validUrlRegex = new RegExp(/^http(s)?:\/\/github.com\/\w.*/);
-
-  let validPkgs = pkgs.filter(pkg => {
-    return validUrlRegex.test(pkg.repository);
-  }).map(pkg => {
-    return {
-      name: pkg.name,
-      repository: pkg.repository,
-      path: pkg.repository.match(new RegExp(/https:\/\/github.com\/(.*)/))[1]
-    };
-  });
-
-  try {
-    let results = [];
-    let responses = await Promise.all(validPkgs.map(pkg => fetchLicense(pkg.path, authToken)));
-
-    for (let i = 0; i < validPkgs.length; i++) {
-      let res = responses[i];
-      let pkg = validPkgs[i];
-      if (res) {
-        results.push({
-          name: pkg.name,
-          repository: pkg.repository,
-          licenseText: res
-        });
+    if (match) {
+      let keys = Object.keys(match);
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        pkg[key] = match[key];
       }
-    }
-    console.log('found github licenses for ', results.length, 'packages');
-    return results;
-  } catch(err) {
-      console.error(err);
-      console.error('Error fetching license file');
-  }
-};
-
-const updateGithubLicenses = (pkgs, githubLicenses) => {
-  for (let i = 0; i < pkgs.length; i++) {
-    const pkg = pkgs[i];
-    let matchingGithubLicense = githubLicenses.find(license => license.name === pkg.name);
-    if (matchingGithubLicense) {
-      pkg.licenseText = matchingGithubLicense.licenseText;
       pkg.hasValidLicense = true;
     }
   }
 };
 
-const updateDevelopedLicenses = (pkgs, developedLicenses) => {
-  for (let i = 0; i < pkgs.length; i++) {
-    const pkg = pkgs[i];
-    const developedLicense = developedLicenses.find(ele => ele.name === pkg.name);
-    if (developedLicense) {
-      pkg.licenses = developedLicense.licenses;
-      pkg.licenseText = developedLicense.licenseText;
-      pkg.hasValidLicense = true;
-    }
-  }
-};
-
-const fixLicenseErrors = async (errPkgs, authToken) => {
-  // extract license from license text
-  let pkgs = JSON.parse(JSON.stringify(errPkgs));
-
+const extractLicenses = pkgs => {
   let copyrightRegex = new RegExp(/copyright/i);
+  let extracted = [];
+
   for (let i = 0; i < pkgs.length; i++) {
     let pkg = pkgs[i];
     let matches = pkg.licenseText.match(new RegExp(/.{0,}\n{0,}#{1,}\s{0,}licen(c|s)e\s{1,}(.[^#]*)/i));
@@ -151,28 +69,40 @@ const fixLicenseErrors = async (errPkgs, authToken) => {
       licenseText.length && copyrightRegex.test(licenseText) &&
       licenseText.split('\n').length >= 2
     ) {
-      pkg.licenseText = licenseText;
-      pkg.hasValidLicense = true;
+      extracted.push({
+        name: pkg.name,
+        licenseText: licenseText
+      });
     }
   }
+
+  return extracted;
+};
+
+const fixLicenseErrors = async (errPkgs, authToken) => {
+  let pkgs = JSON.parse(JSON.stringify(errPkgs));
+  
+  // extract license from license text
+  let extractedLicenses = extractLicenses(pkgs);
+  updateFixedLicenses(pkgs, extractedLicenses);
 
   // search in Github for license files - some packages might have added license file
   if (authToken) {
     let githubLicenses = await fetchLicensesFromRepo(
       pkgs.filter(pkg => !pkg.hasValidLicense), authToken
     ) || [];
-    updateGithubLicenses(pkgs, githubLicenses);
+    updateFixedLicenses(pkgs, githubLicenses);
   }
 
   //fill incomplete licenses
   let developedLicenses = developLicenses(pkgs.filter(pkg => !pkg.hasValidLicense))
-  updateDevelopedLicenses(pkgs, developedLicenses);
+  updateFixedLicenses(pkgs, developedLicenses);
 
   pkgs = pkgs.filter(pkg => pkg.hasValidLicense);
   return pkgs;
 };
 
-const updateFixedLicenses = (licenses, fixedLicenses) => {
+const includeFixes = (licenses, fixedLicenses) => {
   for (let i = 0; i < fixedLicenses.length; i++) {
     const fixedLicense = fixedLicenses[i];
     const licenseIndex = licenses.findIndex(license => license.name === fixedLicense.name);
@@ -218,7 +148,7 @@ checker.init({ start: program.path, production: true, customFormat: customFormat
         });
 
         let fixedLicenses = await fixLicenseErrors(licenseErrors, program.auth);
-        updateFixedLicenses(licenses, fixedLicenses);
+        includeFixes(licenses, fixedLicenses);
 
         if (program.json) {
             licenses = licenses.map(licenseElem => {
