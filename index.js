@@ -2,6 +2,9 @@ const checker = require("license-checker");
 const fs = require("fs");
 const path = require("path");
 const program = require("commander");
+
+const developLicenses = require('./lib/create-licenses').developLicenses;
+
 const fetch = require("node-fetch");
 
 program
@@ -122,27 +125,35 @@ const updateGithubLicenses = (pkgs, githubLicenses) => {
   }
 };
 
-const fixLicenseErrors = async (pkgsInfo, authToken) => {
+const updateDevelopedLicenses = (pkgs, developedLicenses) => {
+  for (let i = 0; i < pkgs.length; i++) {
+    const pkg = pkgs[i];
+    const developedLicense = developedLicenses.find(ele => ele.name === pkg.name);
+    if (developedLicense) {
+      pkg.licenses = developedLicense.licenses;
+      pkg.licenseText = developedLicense.licenseText;
+      pkg.hasValidLicense = true;
+    }
+  }
+};
+
+const fixLicenseErrors = async (errPkgs, authToken) => {
   // extract license from license text
-  let pkgs = [];
+  let pkgs = JSON.parse(JSON.stringify(errPkgs));
+
   let copyrightRegex = new RegExp(/copyright/i);
-  for (let i = 0; i < pkgsInfo.length; i++) {
-    const pkg = {
-      ...pkgsInfo[i]
-    };
+  for (let i = 0; i < pkgs.length; i++) {
+    let pkg = pkgs[i];
     let matches = pkg.licenseText.match(new RegExp(/.{0,}\n{0,}#{1,}\s{0,}licen(c|s)e\s{1,}(.[^#]*)/i));
     let licenseText = (matches && matches[2]) || '';
     licenseText = licenseText.trim();
-    if (licenseText.length) {
-      if (copyrightRegex.test(licenseText) && licenseText.split('\n').length >= 2) {
-        pkg.licenseText = licenseText;
-        pkg.hasValidLicense = true;
-      } else {
-        // TODO: to be used
-        pkg.extractedLicense = licenseText;
-      }
+    if (
+      licenseText.length && copyrightRegex.test(licenseText) &&
+      licenseText.split('\n').length >= 2
+    ) {
+      pkg.licenseText = licenseText;
+      pkg.hasValidLicense = true;
     }
-    pkgs.push(pkg);
   }
 
   // search in Github for license files - some packages might have added license file
@@ -153,7 +164,9 @@ const fixLicenseErrors = async (pkgsInfo, authToken) => {
     updateGithubLicenses(pkgs, githubLicenses);
   }
 
-  //TODO: fill incomplete licenses
+  //fill incomplete licenses
+  let developedLicenses = developLicenses(pkgs.filter(pkg => !pkg.hasValidLicense))
+  updateDevelopedLicenses(pkgs, developedLicenses);
 
   pkgs = pkgs.filter(pkg => pkg.hasValidLicense);
   return pkgs;
