@@ -2,6 +2,7 @@ const checker = require("license-checker");
 const fs = require("fs");
 const path = require("path");
 const program = require("commander");
+const prompts = require("prompts");
 
 const developLicenses = require('./lib/create-licenses').developLicenses;
 const fetchLicensesFromRepo = require('./lib/fetch-licenses').fetchLicensesFromRepo;
@@ -192,9 +193,37 @@ checker.init({ start: program.path, production: true, customFormat: customFormat
           let licenseFile = license.licenseFile.toLowerCase();
           return licenseFile.indexOf('not found') !== -1 || licenseFile.indexOf('readme') !== -1;
         });
+        console.log(`${licenseErrors.length} packages found with incorrect licenses.`);
 
-        let {fixedLicenses, fixesLog} = await fixLicenseErrors(licenseErrors, program.auth);
-        includeFixes(licenses, fixedLicenses);
+        let shouldFixLicenses = licenseErrors.length && await (async () => {
+          let validAnswers = ['y', 'n', 'yes', 'no'];
+          let attemptOptions = ['yes', 'y'];
+
+          const response = await prompts({
+            type: 'text',
+            name: 'value',
+            message: `Do you want license-appendix to attempt to fix licenses? Type y(es)/n(o)`,
+            validate: (value = '') => {
+              if (validAnswers.indexOf(value.trim().toLowerCase()) !== -1) {
+                return true;
+              }
+              return 'Please enter a valid value.';
+            }
+          });
+         
+          return attemptOptions.indexOf(response.value.trim().toLowerCase()) !== -1;
+        })();
+
+        let fixedLicenses = [], fixesLog = {};
+        if (shouldFixLicenses) {
+          let results = await fixLicenseErrors(licenseErrors, program.auth);
+          fixedLicenses = results.fixedLicenses;
+          fixesLog = results.fixesLog;
+          includeFixes(licenses, fixedLicenses);
+          console.log(`${fixedLicenses.length} licenses fixed`);
+        } else {
+          console.log('Licenses not fixed');
+        }
 
         if (!program.quiet) {
           let outputFileName = path.parse(outputFile).name;
@@ -202,6 +231,8 @@ checker.init({ start: program.path, production: true, customFormat: customFormat
           let logStr = generateLog(licenseErrors, fixesLog, fixedLicenses.map(ele => ele.name));
           console.log(`Log file generated, see ${logFileName} for details`);
           fs.writeFileSync(logFileName, logStr);
+        } else {
+          console.log('Log file not generated');
         }
 
         if (program.json) {
