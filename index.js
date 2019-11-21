@@ -12,6 +12,7 @@ program
     .option("-p, --path [directory]", "package to scan")
     .option("-o, --output [file path]", "output appendix file path")
     .option("-a, --auth [oauth token]", "github personal access token")
+    .option("-q, --quiet", "do not generate log file")
     .parse(process.argv);
 
 function isDirSync(checkPath) {
@@ -71,6 +72,7 @@ const extractLicenses = pkgs => {
     ) {
       extracted.push({
         name: pkg.name,
+        version: pkg.version,
         licenseText: licenseText
       });
     }
@@ -79,11 +81,17 @@ const extractLicenses = pkgs => {
   return extracted;
 };
 
+const getPkgNameAndVersion = ele => {
+  return `${ele.name}@${ele.version}`;
+};
+
 const fixLicenseErrors = async (errPkgs, authToken) => {
   let pkgs = JSON.parse(JSON.stringify(errPkgs));
-  
+  let fixesLog = {};
+
   // extract license from license text
   let extractedLicenses = extractLicenses(pkgs);
+  fixesLog.extracted = extractedLicenses.map(getPkgNameAndVersion);
   updateFixedLicenses(pkgs, extractedLicenses);
 
   // search in Github for license files - some packages might have added license file
@@ -91,15 +99,17 @@ const fixLicenseErrors = async (errPkgs, authToken) => {
     let githubLicenses = await fetchLicensesFromRepo(
       pkgs.filter(pkg => !pkg.hasValidLicense), authToken
     ) || [];
+    fixesLog.github = githubLicenses.map(getPkgNameAndVersion);
     updateFixedLicenses(pkgs, githubLicenses);
   }
 
   //fill incomplete licenses
   let developedLicenses = developLicenses(pkgs.filter(pkg => !pkg.hasValidLicense))
+  fixesLog.generated = developedLicenses.map(getPkgNameAndVersion);
   updateFixedLicenses(pkgs, developedLicenses);
 
   pkgs = pkgs.filter(pkg => pkg.hasValidLicense);
-  return pkgs;
+  return {fixedLicenses: pkgs, fixesLog};
 };
 
 const includeFixes = (licenses, fixedLicenses) => {
@@ -114,6 +124,42 @@ const includeFixes = (licenses, fixedLicenses) => {
     }
   }
 };
+
+const listToString = list => {
+  return list.reduce((acc, ele, index) => {
+    return acc + `  ${index+1}.${ele}\n`;
+  }, '') + '\n';
+};
+
+const generateLog = (allErrors, fixesLog, allFixes) => {
+  let logStr = ``;
+
+  logStr += `${allErrors.length} packages found having incorrect licenses.\n`;
+  if (allFixes.length) {
+    logStr += `Licenses fixed for ${allFixes.length} packages totally. See below for details.\n`;
+  }
+
+  logStr += '\n';
+  if (fixesLog.extracted && fixesLog.extracted.length) {
+    logStr += `Licenses extracted from README file for ${fixesLog.extracted.length} packages,\n`;
+    logStr += listToString(fixesLog.extracted);
+  }
+  if (fixesLog.github && fixesLog.github.length) {
+    logStr += `Licenses fetched from Github for ${fixesLog.github.length} packages,\n`;
+    logStr += listToString(fixesLog.github);
+  }
+  if (fixesLog.generated && fixesLog.generated.length) {
+    logStr += `Licenses generated for ${fixesLog.generated.length} packages,\n`;
+    logStr += listToString(fixesLog.generated);
+  }
+
+  let errors = allErrors.filter(pkg => !allFixes.find(name => name === pkg.name));
+  if (errors.length) {
+    logStr += `Licenses couldn't be fixed for ${errors.length} packages,\n`;
+    logStr += listToString(errors.map(getPkgNameAndVersion));
+  }
+  return logStr;
+}
 
 checker.init({ start: program.path, production: true, customFormat: customFormat }, async (error, packages) => {
     if (error) {
@@ -147,8 +193,16 @@ checker.init({ start: program.path, production: true, customFormat: customFormat
           return licenseFile.indexOf('not found') !== -1 || licenseFile.indexOf('readme') !== -1;
         });
 
-        let fixedLicenses = await fixLicenseErrors(licenseErrors, program.auth);
+        let {fixedLicenses, fixesLog} = await fixLicenseErrors(licenseErrors, program.auth);
         includeFixes(licenses, fixedLicenses);
+
+        if (!program.quiet) {
+          let outputFileName = path.parse(outputFile).name;
+          let logFileName = path.resolve(`${process.cwd()}/${outputFileName}.log`);
+          let logStr = generateLog(licenseErrors, fixesLog, fixedLicenses.map(ele => ele.name));
+          console.log(`Log file generated, see ${logFileName} for details`);
+          fs.writeFileSync(logFileName, logStr);
+        }
 
         if (program.json) {
             licenses = licenses.map(licenseElem => {
