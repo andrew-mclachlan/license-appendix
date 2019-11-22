@@ -1,6 +1,8 @@
 # license-appendix
 Create an appendix from the license-checker output.
 
+**NOTE: This tool provides options to fix the broken licenses. Please use at your own interest.**
+
 ## Features
 1. In addition to creating an appendix from license-checker, this tool attempts to fix the broken licenses using below approaches in order,
 	* Extract license from README file using regex.
@@ -23,12 +25,25 @@ Create an appendix from the license-checker output.
 
     `node index.js  --json --path <src_dir> --output licenses.json`
 
-3. Do not generate log file (not recommended)
+3. Auto fix broken licenses
 
-    `node index.js  --json --quiet --path <src_dir> --output licenses.json`
+    `node index.js --fix --json --path <src_dir> --output licenses.json`
 
-4. Use Oauth token to fetch license from GitHub
+4. Skip fixing broken licenses, generate default output from license-checker
 
-    `node index.js --json --path <src_dir> --output licenses.json --auth <your_github_personal_acces_token>`
+    `node index.js --skip --json --path <src_dir> --output licenses.json` 
+
+    *If `--fix` or `--skip` option is not provided, a prompt will be presented to the user to choose either to fix or to skip the broken licenses.*
+
+5. Do not generate log file (not recommended)
+
+    `node index.js --fix --json --quiet --path <src_dir> --output licenses.json`
+
+6. Use Oauth token to fetch license from GitHub
+
+   `node index.js --fix --json --path <src_dir> --output licenses.json --auth <your_github_personal_acces_token>`
 
       [Visit this link](https://help.github.com/en/github/authenticating-to-github/creating-a-personal-access-token-for-the-command-line) to create your personal access token.
+
+## Found a bug?
+Please create an issue with the relevant details. Submitting a PR would be even great !!
