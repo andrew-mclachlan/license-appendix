@@ -12,6 +12,7 @@
   ],
   "author": "Andrew McLachlan",
   "license": "MIT",
+  "repository": "https://github.com/andrew-mclachlan/license-appendix",
   "dependencies": {
     "commander": "^2.20.0",
     "license-checker": "^25.0.1"
