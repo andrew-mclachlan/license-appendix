@@ -14,6 +14,8 @@ program
     .option("-o, --output [file path]", "output appendix file path")
     .option("-a, --auth [oauth token]", "github personal access token")
     .option("-q, --quiet", "do not generate log file")
+    .option("-f, --fix", "fix mode, broken licenses will be fixed, user will not be prompted")
+    .option("-s, --skip", "skip mode, broken licenses will not be fixed, user will not be prompted")
     .parse(process.argv);
 
 function isDirSync(checkPath) {
@@ -195,24 +197,31 @@ checker.init({ start: program.path, production: true, customFormat: customFormat
         });
         console.log(`${licenseErrors.length} packages found with incorrect licenses.`);
 
-        let shouldFixLicenses = licenseErrors.length && await (async () => {
-          let validAnswers = ['y', 'n', 'yes', 'no'];
-          let attemptOptions = ['yes', 'y'];
+        let shouldFixLicenses;
+        if (program.fix) {
+          shouldFixLicenses = true;
+        } else if (program.skip) {
+          shouldFixLicenses = false;
+        } else {
+          shouldFixLicenses = licenseErrors.length && await (async () => {
+            let validAnswers = ['y', 'n', 'yes', 'no'];
+            let attemptOptions = ['yes', 'y'];
 
-          const response = await prompts({
-            type: 'text',
-            name: 'value',
-            message: `Do you want license-appendix to attempt to fix licenses? Type y(es)/n(o)`,
-            validate: (value = '') => {
-              if (validAnswers.indexOf(value.trim().toLowerCase()) !== -1) {
-                return true;
+            const response = await prompts({
+              type: 'text',
+              name: 'value',
+              message: `Do you want license-appendix to attempt to fix licenses? Type y(es)/n(o)`,
+              validate: (value = '') => {
+                if (validAnswers.indexOf(value.trim().toLowerCase()) !== -1) {
+                  return true;
+                }
+                return 'Please enter a valid value.';
               }
-              return 'Please enter a valid value.';
-            }
-          });
-         
-          return attemptOptions.indexOf(response.value.trim().toLowerCase()) !== -1;
-        })();
+            });
+
+            return attemptOptions.indexOf(response.value.trim().toLowerCase()) !== -1;
+          })();
+        }
 
         let fixedLicenses = [], fixesLog = {};
         if (shouldFixLicenses) {
