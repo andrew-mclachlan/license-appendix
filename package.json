@@ -16,7 +16,7 @@
   "dependencies": {
     "commander": "^2.20.0",
     "license-checker": "^25.0.1",
-    "node-fetch": "^2.6.1",
+    "node-fetch": "^2.6.7",
     "prompts": "^2.3.0"
   }
 }
